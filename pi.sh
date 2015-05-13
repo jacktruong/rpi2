@@ -196,7 +196,7 @@ chrooting() {
     sed -i $BOOTSTRAP/etc/apt/sources.list -e "s/main/main contrib non-free/"
     echo "deb http://archive.raspberrypi.org/debian/ wheezy main" >> $BOOTSTRAP/etc/apt/sources.list
 
-    FIRM=$(fgrep "raspb" $BOOTSTRAP/etc/apt/sources.list | cut -f 2 -d ' ')
+    FIRM=$(fgrep "raspb" $BOOTSTRAP/etc/apt/sources.list | cut -f 3 -d ' ')
     echo "Setting up a distro pin for $FIRM"
     echo "# This sets the priority of $FIRM low so ftp.debian files is used" > $BOOTSTRAP/etc/apt/preferences.d/01repo.pref
     echo "Package: *"  >> $BOOTSTRAP/etc/apt/preferences.d/01repo.pref
