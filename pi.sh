@@ -86,7 +86,7 @@ disk_image() {
     MOUNT=0
     IMAGE="rpi2.img"
     echo "Creating a 3GB image"
-    if [ -a "$IMAGE" ]; then
+    if [ -f "$IMAGE" ]; then
         echo "Conflicting image found, start the script again."
         exit
     fi
@@ -138,7 +138,7 @@ bootstrap() {
     echo "Bootstrapping Debian"
 
     BOOTSTRAP=$(mktemp -d)
-    INCLUDE="--include=kbd,locales,keyboard-configuration,console-setup,dphys-swapfile"
+    INCLUDE="--include=kbd,locales,keyboard-configuration,console-setup"
     MIRROR="http://ftp.us.debian.org/debian"
     RELEASE="stable"
     mount -t ext4 -o sync $ROOTPART $BOOTSTRAP
@@ -203,29 +203,67 @@ chrooting() {
     echo "Pin: release n=$FIRM"  >> $BOOTSTRAP/etc/apt/preferences.d/01repo.pref
     echo "Pin-Priority: 50"  >> $BOOTSTRAP/etc/apt/preferences.d/01repo.pref
 
+    if [ ! -f "config/etc.apt.apt.conf" ]; then
+        echo "File not found"
+        unmounting
+        exit
+    fi
+
     cp config/etc.apt.apt.conf $BOOTSTRAP/etc/apt/apt.conf
 
     echo "America/Toronto" > $BOOTSTRAP/etc/timezone
 
+    if [ ! -f "/etc/locale.gen" ]; then
+        echo "File not found"
+        unmounting
+        exit
+    fi
+
     cp /etc/locale.gen $BOOTSTRAP/etc/locale.gen
     DEFAULT_LOCALE="\"en_US.UTF-8\" \"en_US:en\""
+
+    if [ ! -f "/etc/default/keyboard" ]; then
+        echo "File not found"
+        unmounting
+        exit
+    fi
 
     cp /etc/default/keyboard $BOOTSTRAP/etc/default/keyboard
 
     echo "Creating config.txt/cmdline.txt"
+
+    if [ ! -f "config/boot.config.txt" ]; then
+        echo "File not found"
+        unmounting
+        exit
+    fi
+
     cp config/boot.config.txt $BOOTSTRAP/boot/config.txt
+
+    if [ ! -f "config/boot.cmdline.txt" ]; then
+        echo "File not found"
+        unmounting
+        exit
+    fi
+
     cp config/boot.cmdline.txt $BOOTSTRAP/boot/cmdline.txt
 
     echo "Tweaking the RPI"
     echo "" >> $BOOTSTRAP/etc/sysctl.conf
     echo "# http://www.raspberrypi.org/forums/viewtopic.php?p=104096#p104096" >> $BOOTSTRAP/etc/sysctl.conf
     echo "# rpi tweaks" >> $BOOTSTRAP/etc/sysctl.conf
-    echo "vm.swappiness = 1" >> $BOOTSTRAP/etc/sysctl.conf
+    #echo "vm.swappiness = 1" >> $BOOTSTRAP/etc/sysctl.conf
     echo "vm.min_free_kbytes = 8192" >> $BOOTSTRAP/etc/sysctl.conf
     echo "vm.vfs_cache_pressure = 50" >> $BOOTSTRAP/etc/sysctl.conf
     echo "vm.dirty_writeback_centisecs = 1500" >> $BOOTSTRAP/etc/sysctl.conf
     echo "vm.dirty_ratio = 20" >> $BOOTSTRAP/etc/sysctl.conf
     echo "vm.dirty_background_ratio = 10" >> $BOOTSTRAP/etc/sysctl.conf
+
+    if [ ! -f "/etc/hosts" ]; then
+        echo "File not found"
+        unmounting
+        exit
+    fi
 
     echo "Networking"
     cp /etc/hosts $BOOTSTRAP/etc/hosts
@@ -233,6 +271,12 @@ chrooting() {
     sed -i $BOOTSTRAP/etc/default/rcS -e "s/^#FSCKFIX=no/FSCKFIX=yes/"
     sed -i $BOOTSTRAP/lib/udev/rules.d/75-persistent-net-generator.rules -e 's/KERNEL\!="eth\*|ath\*|wlan\*\[0-9\]/KERNEL\!="ath\*/'
     chroot $BOOTSTRAP dpkg-divert --add --local /lib/udev/rules.d/75-persistent-net-generator.rules
+
+    if [ ! -f "config/etc.fstab" ]; then
+        echo "File not found"
+        unmounting
+        exit
+    fi
 
     echo "fstab"
     cp config/etc.fstab $BOOTSTRAP/etc/fstab
@@ -244,16 +288,25 @@ chrooting() {
     chroot $BOOTSTRAP dpkg-reconfigure -f noninteractive keyboard-configuration
     chroot $BOOTSTRAP dpkg-reconfigure -f noninteractive console-setup
 
+    if [ ! -f "config/etc.network.interfaces" ]; then
+        echo "File not found"
+        unmounting
+        exit
+    fi
     cp config/etc.network.interfaces $BOOTSTRAP/etc/network/interfaces
 
+    if [ ! -f "config/etc.modprobe.d.ipv6.conf" ]; then
+        echo "File not found"
+        unmounting
+        exit
+    fi
     cp config/etc.modprobe.d.ipv6.conf $BOOTSTRAP/etc/modprobe.d/ipv6.conf
 
     #updating system
     echo "updating system"
     chroot $BOOTSTRAP apt-get update
     chroot $BOOTSTRAP apt-get -y upgrade
-    chroot $BOOTSTRAP apt-get -y install libraspberrypi-bin libraspberrypi-dev libraspberrypi-doc raspberrypi-bootloader dbus fake-hwclock psmisc ntp  raspi-copies-and-fills raspi-config
-    #chroot $BOOTSTRAP apt-get -y install sudo icewm-lite python
+    chroot $BOOTSTRAP apt-get -y install libraspberrypi-bin libraspberrypi-dev libraspberrypi-doc raspberrypi-bootloader dbus fake-hwclock psmisc ntp raspi-copies-and-fills raspi-config
     chroot $BOOTSTRAP apt-get clean
     chroot $BOOTSTRAP apt-get autoremove -y
 
@@ -261,6 +314,25 @@ chrooting() {
     sync
     # done
     echo "Done with the image"
+}
+
+configuring_system() {
+    # adding the ubuntu vivid repo to poke at chromium-browser
+    echo "deb http://ports.ubuntu.com/ vivid main universe" >> $BOOTSTRAP/etc/apt/sources.list
+
+    # pinning ubuntu lower so packages don't get mixed up
+    echo "Package: *" >> $BOOTSTRAP/etc/apt/preferences.d/02vivid.pref
+    echo "Pin: release n=vivid" >> $BOOTSTRAP/etc/apt/preferences.d/02vivid.pref
+    echo "Pin-Priority: 200" >> $BOOTSTRAP/etc/apt/preferences.d/02vivid.pref
+
+    # add pubkey for ubuntu repo
+    chroot $BOOTSTRAP apt-key adv --keyserver keyserver.ubuntu.com --recv-keys c0b21f32
+    chroot $BOOTSTRAP apt-key adv --keyserver keyserver.ubuntu.com --recv-keys 437d05b5
+    chroot $BOOTSTRAP apt-get update
+    chroot $BOOTSTRAP apt-get -y install icewm-lite unclutter chromium-browser lsb-release libexif12 cpufrequtils xserver-xorg xorg x11-utils
+
+    sed -i 's/^allowed_users=console$/allowed_users=anybody/' $BOOTSTRAP/etc/X11/Xwrapper.config
+    sed -i 's/^exit 0$/su -l kiosk -c startx\nexit 0/' $BOOTSTRAP/etc/rc.local
 }
 
 unmounting() {
@@ -283,6 +355,8 @@ unmounting() {
         MOUNT=$((MOUNT-1))
         fuser -av $BOOTSTRAP
     fi
+    echo "Done"
+    exit
 }
 
 checking_apps
@@ -290,4 +364,5 @@ disk_image
 bootstrap
 mounting
 chrooting
+configuring_system
 unmounting
