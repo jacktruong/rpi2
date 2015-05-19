@@ -331,8 +331,33 @@ configuring_system() {
     chroot $BOOTSTRAP apt-get update
     chroot $BOOTSTRAP apt-get -y install icewm-lite unclutter chromium-browser lsb-release libexif12 cpufrequtils xserver-xorg xorg x11-utils
 
+    # create a user just for loading the kiosk page, allow ssh access eventually
+    chroot $BOOTSTRAP adduser --disabled-password --gecos "" --quiet kiosk
+
     sed -i 's/^allowed_users=console$/allowed_users=anybody/' $BOOTSTRAP/etc/X11/Xwrapper.config
-    sed -i 's/^exit 0$/su -l kiosk -c startx\nexit 0/' $BOOTSTRAP/etc/rc.local
+    
+
+    if [ ! -f "config/etc.systemd.system.getty.tty1.service.d.override.conf" ]; then
+        echo "File not found"
+        unmounting
+        exit
+    fi
+    mkdir -p $BOOTSTRAP/etc/systemd/system/getty\@tty1.service.d/
+    cp config/etc.systemd.system.getty.tty1.service.d.override.conf $BOOTSTRAP/etc/systemd/system/getty\@tty1.service.d/autologin.conf
+
+    if [ ! -f "config/home.kiosk.xinitrc" ]; then
+        echo "File not found"
+        unmounting
+        exit
+    fi
+    cp config/home.kiosk.xinitrc $BOOTSTRAP/home/kiosk/.xinitrc
+
+    if [ ! -f "config/home.kiosk.bash.profile" ]; then
+        echo "File not found"
+        unmounting
+        exit
+    fi
+    cp config/home.kiosk.bash.profile $BOOTSTRAP/home/kiosk/.bash_profile
 }
 
 unmounting() {
