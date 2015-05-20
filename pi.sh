@@ -358,6 +358,21 @@ configuring_system() {
         exit
     fi
     cp config/home.kiosk.bash.profile $BOOTSTRAP/home/kiosk/.bash_profile
+
+    if [ ! -f "bin/emerge-armhf" ]; then
+        echo "File not found"
+        unmounting
+        exit
+    fi
+    cp bin/emerge-armhf $BOOTSTRAP/home/kiosk/.emerge
+    chmod +x $BOOTSTRAP/home/kiosk/.emerge
+
+    if [ ! -f "config/home.kiosk.emerge.pl" ]; then
+        echo "File not found"
+        unmounting
+        exit
+    fi
+    cp config/home.kiosk.emerge.pl $BOOTSTRAP/home/kiosk/.emerge.pl
 }
 
 unmounting() {

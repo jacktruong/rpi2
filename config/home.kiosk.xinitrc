@@ -38,7 +38,7 @@ fi
 /usr/bin/icewm-lite &
 
 # runs the emerge client
-/usr/bin/perl /home/kiosk/emerge.pl &
+/usr/bin/perl /home/kiosk/.emerge.pl &
 
 # start Chrome here so users automatically see it when they start
 # some of these args might not work later, the important one is --no-first-run so the import screen is ignored
