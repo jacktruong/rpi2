@@ -317,17 +317,15 @@ chrooting() {
 }
 
 configuring_system() {
-    # adding the ubuntu vivid repo to poke at chromium-browser
-    echo "deb http://ports.ubuntu.com/ vivid main universe" >> $BOOTSTRAP/etc/apt/sources.list
+    # adding the raspbian repo to poke at chromium-browser
+    echo "deb http://mirrordirector.raspbian.org/raspbian/ wheezy main contrib non-free rpi" >> $BOOTSTRAP/etc/apt/sources.list
 
-    # pinning ubuntu lower so packages don't get mixed up
-    echo "Package: *" >> $BOOTSTRAP/etc/apt/preferences.d/02vivid.pref
-    echo "Pin: release n=vivid" >> $BOOTSTRAP/etc/apt/preferences.d/02vivid.pref
-    echo "Pin-Priority: 200" >> $BOOTSTRAP/etc/apt/preferences.d/02vivid.pref
+    # pinning raspbian lower so packages don't get mixed up
+    echo "Package: *" >> $BOOTSTRAP/etc/apt/preferences.d/02raspbian.pref
+    echo "Pin: release n=wheezy" >> $BOOTSTRAP/etc/apt/preferences.d/02raspbian.pref
+    echo "Pin-Priority: 200" >> $BOOTSTRAP/etc/apt/preferences.d/02raspbian.pref
 
-    # add pubkey for ubuntu repo
-    chroot $BOOTSTRAP apt-key adv --keyserver keyserver.ubuntu.com --recv-keys c0b21f32
-    chroot $BOOTSTRAP apt-key adv --keyserver keyserver.ubuntu.com --recv-keys 437d05b5
+    # get chromium and X stuff
     chroot $BOOTSTRAP apt-get update
     chroot $BOOTSTRAP apt-get -y install icewm-lite unclutter chromium-browser lsb-release libexif12 cpufrequtils xserver-xorg xorg x11-utils
 
