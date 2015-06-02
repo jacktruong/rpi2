@@ -17,6 +17,8 @@ else
     echo "Root user detected"
 fi
 
+MOUNT=0
+
 ## checking for installed applications
 checking_apps() {
     echo "Checking for necessary programs..."
@@ -81,9 +83,106 @@ checking_apps() {
     fi
 }
 
+checking_files() {
+    if [ ! -f "config/etc.apt.apt.conf" ]; then
+        echo "File not found"
+        unmounting
+        exit
+    fi
+
+    if [ ! -f "/etc/locale.gen" ]; then
+        echo "File not found"
+        unmounting
+        exit
+    fi
+
+    if [ ! -f "/etc/default/keyboard" ]; then
+        echo "File not found"
+        unmounting
+        exit
+    fi
+
+    if [ ! -f "config/boot.config.txt" ]; then
+        echo "File not found"
+        unmounting
+        exit
+    fi
+
+    if [ ! -f "config/boot.cmdline.txt" ]; then
+        echo "File not found"
+        unmounting
+        exit
+    fi
+
+    if [ ! -f "/etc/hosts" ]; then
+        echo "File not found"
+        unmounting
+        exit
+    fi
+
+    if [ ! -f "config/etc.fstab" ]; then
+        echo "File not found"
+        unmounting
+        exit
+    fi
+
+    if [ ! -f "config/etc.network.interfaces" ]; then
+        echo "File not found"
+        unmounting
+        exit
+    fi
+
+    if [ ! -f "config/etc.modprobe.d.ipv6.conf" ]; then
+        echo "File not found"
+        unmounting
+        exit
+    fi
+
+    if [ ! -f "config/etc.systemd.system.getty.tty1.service.d.autologin.conf" ]; then
+        echo "File not found"
+        unmounting
+        exit
+    fi
+
+    if [ ! -f "config/home.kiosk.xinitrc" ]; then
+        echo "File not found"
+        unmounting
+        exit
+    fi
+
+    if [ ! -f "config/home.kiosk.bash.profile" ]; then
+        echo "File not found"
+        unmounting
+        exit
+    fi
+
+    if [ ! -f "bin/emerge-armhf" ]; then
+        echo "File not found"
+        unmounting
+        exit
+    fi
+
+    if [ ! -f "config/home.kiosk.emerge.pl" ]; then
+        echo "File not found"
+        unmounting
+        exit
+    fi
+
+    if [ ! -f "config/etc.profile.d.enginfo-config.sh" ]; then
+        echo "File not found"
+        unmounting
+        exit
+    fi
+
+    if [ ! -f "config/enginfo-config" ]; then
+        echo "File not found"
+        unmounting
+        exit
+    fi
+}
+
 ## creating disk image
 disk_image() {
-    MOUNT=0
     IMAGE="rpi2.img"
     echo "Creating a 3GB image"
     if [ -f "$IMAGE" ]; then
@@ -159,6 +258,7 @@ bootstrap() {
     echo "Successfully bootstrapped"
     sync
 }
+
 mounting() {
 ## mounting stuff
     if [ "$MOUNT" != 2 ]; then
@@ -203,48 +303,25 @@ chrooting() {
     echo "Pin: release n=$FIRM"  >> $BOOTSTRAP/etc/apt/preferences.d/01repo.pref
     echo "Pin-Priority: 50"  >> $BOOTSTRAP/etc/apt/preferences.d/01repo.pref
 
-    if [ ! -f "config/etc.apt.apt.conf" ]; then
-        echo "File not found"
-        unmounting
-        exit
-    fi
+    
 
     cp config/etc.apt.apt.conf $BOOTSTRAP/etc/apt/apt.conf
 
     echo "America/Toronto" > $BOOTSTRAP/etc/timezone
 
-    if [ ! -f "/etc/locale.gen" ]; then
-        echo "File not found"
-        unmounting
-        exit
-    fi
 
     cp /etc/locale.gen $BOOTSTRAP/etc/locale.gen
     DEFAULT_LOCALE="\"en_US.UTF-8\" \"en_US:en\""
 
-    if [ ! -f "/etc/default/keyboard" ]; then
-        echo "File not found"
-        unmounting
-        exit
-    fi
+
 
     cp /etc/default/keyboard $BOOTSTRAP/etc/default/keyboard
 
     echo "Creating config.txt/cmdline.txt"
 
-    if [ ! -f "config/boot.config.txt" ]; then
-        echo "File not found"
-        unmounting
-        exit
-    fi
 
     cp config/boot.config.txt $BOOTSTRAP/boot/config.txt
 
-    if [ ! -f "config/boot.cmdline.txt" ]; then
-        echo "File not found"
-        unmounting
-        exit
-    fi
 
     cp config/boot.cmdline.txt $BOOTSTRAP/boot/cmdline.txt
 
@@ -259,11 +336,6 @@ chrooting() {
     echo "vm.dirty_ratio = 20" >> $BOOTSTRAP/etc/sysctl.conf
     echo "vm.dirty_background_ratio = 10" >> $BOOTSTRAP/etc/sysctl.conf
 
-    if [ ! -f "/etc/hosts" ]; then
-        echo "File not found"
-        unmounting
-        exit
-    fi
 
     echo "Networking"
     cp /etc/hosts $BOOTSTRAP/etc/hosts
@@ -272,11 +344,6 @@ chrooting() {
     sed -i $BOOTSTRAP/lib/udev/rules.d/75-persistent-net-generator.rules -e 's/KERNEL\!="eth\*|ath\*|wlan\*\[0-9\]/KERNEL\!="ath\*/'
     chroot $BOOTSTRAP dpkg-divert --add --local /lib/udev/rules.d/75-persistent-net-generator.rules
 
-    if [ ! -f "config/etc.fstab" ]; then
-        echo "File not found"
-        unmounting
-        exit
-    fi
 
     echo "fstab"
     cp config/etc.fstab $BOOTSTRAP/etc/fstab
@@ -288,18 +355,8 @@ chrooting() {
     chroot $BOOTSTRAP dpkg-reconfigure -f noninteractive keyboard-configuration
     chroot $BOOTSTRAP dpkg-reconfigure -f noninteractive console-setup
 
-    if [ ! -f "config/etc.network.interfaces" ]; then
-        echo "File not found"
-        unmounting
-        exit
-    fi
     cp config/etc.network.interfaces $BOOTSTRAP/etc/network/interfaces
 
-    if [ ! -f "config/etc.modprobe.d.ipv6.conf" ]; then
-        echo "File not found"
-        unmounting
-        exit
-    fi
     cp config/etc.modprobe.d.ipv6.conf $BOOTSTRAP/etc/modprobe.d/ipv6.conf
 
     #updating system
@@ -333,44 +390,20 @@ configuring_system() {
     chroot $BOOTSTRAP adduser --disabled-password --gecos "" --quiet kiosk
 
     sed -i 's/^allowed_users=console$/allowed_users=anybody/' $BOOTSTRAP/etc/X11/Xwrapper.config
-    
 
-    if [ ! -f "config/etc.systemd.system.getty.tty1.service.d.override.conf" ]; then
-        echo "File not found"
-        unmounting
-        exit
-    fi
     mkdir -p $BOOTSTRAP/etc/systemd/system/getty\@tty1.service.d/
-    cp config/etc.systemd.system.getty.tty1.service.d.override.conf $BOOTSTRAP/etc/systemd/system/getty\@tty1.service.d/autologin.conf
 
-    if [ ! -f "config/home.kiosk.xinitrc" ]; then
-        echo "File not found"
-        unmounting
-        exit
-    fi
+    cp config/etc.systemd.system.getty.tty1.service.d.autologin.conf $BOOTSTRAP/etc/systemd/system/getty\@tty1.service.d/autologin.conf
     cp config/home.kiosk.xinitrc $BOOTSTRAP/home/kiosk/.xinitrc
-
-    if [ ! -f "config/home.kiosk.bash.profile" ]; then
-        echo "File not found"
-        unmounting
-        exit
-    fi
     cp config/home.kiosk.bash.profile $BOOTSTRAP/home/kiosk/.bash_profile
-
-    if [ ! -f "bin/emerge-armhf" ]; then
-        echo "File not found"
-        unmounting
-        exit
-    fi
     cp bin/emerge-armhf $BOOTSTRAP/home/kiosk/.emerge
-    chmod +x $BOOTSTRAP/home/kiosk/.emerge
-
-    if [ ! -f "config/home.kiosk.emerge.pl" ]; then
-        echo "File not found"
-        unmounting
-        exit
-    fi
     cp config/home.kiosk.emerge.pl $BOOTSTRAP/home/kiosk/.emerge.pl
+    cp config/etc.profile.d.enginfo-config.sh $BOOTSTRAP/etc/profile.d/enginfo-config.sh
+    cp config/enginfo-config $BOOTSTRAP/usr/bin/enginfo-config
+
+    chmod +x $BOOTSTRAP/etc/profile.d/enginfo-config.sh
+    chmod +x $BOOTSTRAP/home/kiosk/.emerge
+    chmod +x $BOOTSTRAP/usr/bin/enginfo-config
 }
 
 unmounting() {
@@ -398,6 +431,7 @@ unmounting() {
 }
 
 checking_apps
+checking_files
 disk_image
 bootstrap
 mounting
