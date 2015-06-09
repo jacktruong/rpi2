@@ -179,18 +179,36 @@ checking_files() {
         unmounting
         exit
     fi
+
+    if [ ! -f "config/home.kiosk.cron" ]; then
+        echo "File not found"
+        unmounting
+        exit
+    fi
+
+    if [ ! -f "config/home.kiosk.heartbeat.sh" ]; then
+        echo "File not found"
+        unmounting
+        exit
+    fi
+
+    if [ ! -f "config/root.iptables" ]; then
+        echo "File not found"
+        unmounting
+        exit
+    fi
 }
 
 ## creating disk image
 disk_image() {
     IMAGE="rpi2.img"
-    echo "Creating a 3GB image"
+    echo "Creating a 2GB image"
     if [ -f "$IMAGE" ]; then
         echo "Conflicting image found, start the script again."
         exit
     fi
 
-    dd if=/dev/zero of="$IMAGE" bs=1M count=3000 iflag=fullblock
+    dd if=/dev/zero of="$IMAGE" bs=1M count=2000 iflag=fullblock
 
     (echo o; echo n; echo p; echo 1; echo; echo +40M; echo a; echo t; echo 6; echo n; echo p; echo 2; echo; echo; echo w) | fdisk "$IMAGE"
 
@@ -289,10 +307,6 @@ chrooting() {
     chroot $BOOTSTRAP sh -c 'wget -q -O - http://archive.raspberrypi.org/debian/raspberrypi.gpg.key | apt-key add -'
     chroot $BOOTSTRAP sh -c 'wget -q -O - http://mirrordirector.raspbian.org/raspbian.public.key | apt-key add -'
 
-    if [ "$echo" -gt 0 ]; then
-        chroot $BOOTSTRAP apt-key list
-    fi
-
     sed -i $BOOTSTRAP/etc/apt/sources.list -e "s/main/main contrib non-free/"
     echo "deb http://archive.raspberrypi.org/debian/ wheezy main" >> $BOOTSTRAP/etc/apt/sources.list
 
@@ -363,7 +377,7 @@ chrooting() {
     echo "updating system"
     chroot $BOOTSTRAP apt-get update
     chroot $BOOTSTRAP apt-get -y upgrade
-    chroot $BOOTSTRAP apt-get -y install libraspberrypi-bin libraspberrypi-dev libraspberrypi-doc raspberrypi-bootloader dbus fake-hwclock psmisc ntp raspi-copies-and-fills raspi-config
+    chroot $BOOTSTRAP apt-get -y install libraspberrypi-bin raspberrypi-bootloader dbus fake-hwclock psmisc ntp raspi-copies-and-fills raspi-config
     chroot $BOOTSTRAP apt-get clean
     chroot $BOOTSTRAP apt-get autoremove -y
 
@@ -400,10 +414,34 @@ configuring_system() {
     cp config/home.kiosk.emerge.pl $BOOTSTRAP/home/kiosk/.emerge.pl
     cp config/etc.profile.d.enginfo-config.sh $BOOTSTRAP/etc/profile.d/enginfo-config.sh
     cp config/enginfo-config $BOOTSTRAP/usr/bin/enginfo-config
+    cp config/home.kiosk.cron $BOOTSTRAP/home/kiosk/.cron
+    cp config/home.kiosk.heartbeat.sh $BOOTSTRAP/home/kiosk/.heartbeat.sh
+    cp config/root.iptables $BOOTSTRAP/root/iptables
+
+    echo '#!/bin/sh' > $BOOTSTRAP/etc/network/if-pre-up.d/tables
+    echo "" >> $BOOTSTRAP/etc/network/if-pre-up.d/tables
+    echo "/sbin/iptables-restore < /root/iptables" >> $BOOTSTRAP/etc/network/if-pre-up.d/tables
 
     chmod +x $BOOTSTRAP/etc/profile.d/enginfo-config.sh
     chmod +x $BOOTSTRAP/home/kiosk/.emerge
     chmod +x $BOOTSTRAP/usr/bin/enginfo-config
+    chmod +x $BOOTSTRAP/home/kiosk/.heartbeat.sh
+    chmod +x $BOOTSTRAP/etc/network/if-pre-up.d/tables
+    
+    chroot $BOOTSTRAP chown kiosk:kiosk /home/kiosk/.xinitrc
+    chmod +x $BOOTSTRAP/home/kiosk/.xinitrc
+}
+
+monkey() {
+    if [ ! -f "bin/monkey-1.5.6-compiled.tgz" ]; then
+        echo "Not installing monkey."
+        unmounting
+        exit
+    fi
+
+    tar xzf bin/monkey-1.5.6-compiled.tgz -C $BOOTSTRAP/home/kiosk/
+
+    chroot $BOOTSTRAP apt-get -y install policykit-1
 }
 
 unmounting() {
@@ -437,4 +475,5 @@ bootstrap
 mounting
 chrooting
 configuring_system
+monkey
 unmounting

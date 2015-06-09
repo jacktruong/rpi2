@@ -108,6 +108,12 @@ disable_enginfo_config_at_boot() {
   fi
 }
 
+do_cron() {
+  if [ -e /home/kiosk/.cron ]; then
+    /usr/bin/crontab -u kiosk /home/kiosk/.cron
+  fi
+}
+
 do_finish() {
   disable_enginfo_config_at_boot
   if [ $ASK_TO_REBOOT -eq 1 ]; then
@@ -149,7 +155,8 @@ while true; do
     "2 Location" "Set the location of thie Raspberry Pi" \
     "3 Hostname" "Set the visible name for this Pi on a network" \
     "4 Change password" "Change the password for the root account" \
-    "5 About enginfo-config" "Information about this configuration tool" \
+    "5 Install crontab" "Install crontab for kiosk user" \
+    "6 About enginfo-config" "Information about this configuration tool" \
     3>&1 1>&2 2>&3)
   RET=$?
   if [ $RET -eq 1 ]; then
@@ -160,7 +167,8 @@ while true; do
       2\ *) do_change_location ;;
       3\ *) do_change_hostname ;;
       4\ *) do_change_password ;;
-      5\ *) do_about ;;
+      5\ *) do_cron ;;
+      6\ *) do_about ;;
       *) whiptail --msgbox "Programmer error: unrecognized option" 20 60 1 ;;
     esac || whiptail --msgbox "There was an error running option $FUN" 20 60 1
   else

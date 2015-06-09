@@ -19,7 +19,7 @@ fi
 /bin/sleep 3
 
 # ping the server to let it know the kiosk is awake
-/usr/bin/wget -q -O - --spider http://mmm.eng.uwaterloo.ca/~enginfo/enginfo2/alive.php
+/usr/bin/wget -q -O - --spider http://mmm.eng.uwaterloo.ca/~enginfo/enginfo2/alive.php?loc=${LOCATION}
 
 # prevent screen blanking
 /usr/bin/xset s off
@@ -29,6 +29,10 @@ fi
 
 # hide the mouse cursor
 /usr/bin/unclutter -noevents -idle 1 &
+
+if [ -e "/home/kiosk/monkey-1.5.6/bin/monkey" ]; then
+	/home/kiosk/monkey-1.5.6/bin/monkey -D
+fi
 
 # kill former instances of emerge, if they exist
 /usr/bin/killall perl
