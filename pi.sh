@@ -398,8 +398,9 @@ configuring_system() {
 
     # get chromium and X stuff
     chroot $BOOTSTRAP apt-get update
-    chroot $BOOTSTRAP apt-get -y install icewm-lite unclutter chromium-browser lsb-release libexif12 cpufrequtils xserver-xorg xorg x11-utils
-
+    chroot $BOOTSTRAP apt-get -y install icewm-lite unclutter chromium-browser lsb-release libexif12 xserver-xorg xorg x11-utils
+    chroot $BOOTSTRAP apt-get clean
+    chroot $BOOTSTRAP apt-get autoclean
     # create a user just for loading the kiosk page, allow ssh access eventually
     chroot $BOOTSTRAP adduser --disabled-password --gecos "" --quiet kiosk
 
@@ -442,6 +443,8 @@ monkey() {
     tar xzf bin/monkey-1.5.6-compiled.tgz -C $BOOTSTRAP/home/kiosk/
 
     chroot $BOOTSTRAP apt-get -y install policykit-1
+    chroot $BOOTSTRAP apt-get clean
+    chroot $BOOTSTRAP apt-get autoclean
 }
 
 unmounting() {
