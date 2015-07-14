@@ -132,12 +132,6 @@ checking_files() {
         exit
     fi
 
-    if [ ! -f "config/etc.modprobe.d.ipv6.conf" ]; then
-        echo "File not found"
-        unmounting
-        exit
-    fi
-
     if [ ! -f "config/etc.systemd.system.getty.tty1.service.d.autologin.conf" ]; then
         echo "File not found"
         unmounting
@@ -168,18 +162,6 @@ checking_files() {
         exit
     fi
 
-    if [ ! -f "config/etc.profile.d.enginfo-config.sh" ]; then
-        echo "File not found"
-        unmounting
-        exit
-    fi
-
-    if [ ! -f "config/enginfo-config" ]; then
-        echo "File not found"
-        unmounting
-        exit
-    fi
-
     if [ ! -f "config/home.kiosk.cron" ]; then
         echo "File not found"
         unmounting
@@ -197,6 +179,12 @@ checking_files() {
         unmounting
         exit
     fi
+
+    if [ ! -f "config/home.kiosk.ssh.authorized_keys" ]; then
+        echo "File not found"
+        unmounting
+        exit
+    fi
 }
 
 ## creating disk image
@@ -210,7 +198,7 @@ disk_image() {
 
     dd if=/dev/zero of="$IMAGE" bs=1M count=2000 iflag=fullblock
 
-    (echo o; echo n; echo p; echo 1; echo; echo +40M; echo a; echo t; echo 6; echo n; echo p; echo 2; echo; echo; echo w) | fdisk "$IMAGE"
+    (echo o; echo n; echo p; echo 1; echo; echo +128M; echo a; echo t; echo 6; echo n; echo p; echo 2; echo; echo; echo w) | fdisk "$IMAGE"
 
     fdisk -l "$IMAGE"
 
@@ -245,7 +233,7 @@ disk_image() {
     mkdosfs -n BOOT $BOOTPART
 
     echo "Formatting the root partition"
-    mkfs.ext4 -O ^has_journal -E stride=0,stripe-width=128 -b 4096 -L rootfs $ROOTPART
+    mkfs.ext4 -b 4096 -L rootfs $ROOTPART
 
     sync
 }
@@ -317,33 +305,24 @@ chrooting() {
     echo "Pin: release n=$FIRM"  >> $BOOTSTRAP/etc/apt/preferences.d/01repo.pref
     echo "Pin-Priority: 50"  >> $BOOTSTRAP/etc/apt/preferences.d/01repo.pref
 
-    
-
     cp config/etc.apt.apt.conf $BOOTSTRAP/etc/apt/apt.conf
 
     echo "America/Toronto" > $BOOTSTRAP/etc/timezone
 
-
     cp /etc/locale.gen $BOOTSTRAP/etc/locale.gen
     DEFAULT_LOCALE="\"en_US.UTF-8\" \"en_US:en\""
-
-
 
     cp /etc/default/keyboard $BOOTSTRAP/etc/default/keyboard
 
     echo "Creating config.txt/cmdline.txt"
 
-
     cp config/boot.config.txt $BOOTSTRAP/boot/config.txt
-
-
     cp config/boot.cmdline.txt $BOOTSTRAP/boot/cmdline.txt
 
     echo "Tweaking the RPI"
     echo "" >> $BOOTSTRAP/etc/sysctl.conf
     echo "# http://www.raspberrypi.org/forums/viewtopic.php?p=104096#p104096" >> $BOOTSTRAP/etc/sysctl.conf
     echo "# rpi tweaks" >> $BOOTSTRAP/etc/sysctl.conf
-    #echo "vm.swappiness = 1" >> $BOOTSTRAP/etc/sysctl.conf
     echo "vm.min_free_kbytes = 8192" >> $BOOTSTRAP/etc/sysctl.conf
     echo "vm.vfs_cache_pressure = 50" >> $BOOTSTRAP/etc/sysctl.conf
     echo "vm.dirty_writeback_centisecs = 1500" >> $BOOTSTRAP/etc/sysctl.conf
@@ -358,7 +337,6 @@ chrooting() {
     sed -i $BOOTSTRAP/lib/udev/rules.d/75-persistent-net-generator.rules -e 's/KERNEL\!="eth\*|ath\*|wlan\*\[0-9\]/KERNEL\!="ath\*/'
     chroot $BOOTSTRAP dpkg-divert --add --local /lib/udev/rules.d/75-persistent-net-generator.rules
 
-
     echo "fstab"
     cp config/etc.fstab $BOOTSTRAP/etc/fstab
 
@@ -370,8 +348,6 @@ chrooting() {
     chroot $BOOTSTRAP dpkg-reconfigure -f noninteractive console-setup
 
     cp config/etc.network.interfaces $BOOTSTRAP/etc/network/interfaces
-
-    cp config/etc.modprobe.d.ipv6.conf $BOOTSTRAP/etc/modprobe.d/ipv6.conf
 
     #updating system
     echo "updating system"
@@ -398,39 +374,40 @@ configuring_system() {
 
     # get chromium and X stuff
     chroot $BOOTSTRAP apt-get update
-    chroot $BOOTSTRAP apt-get -y install icewm-lite unclutter chromium-browser lsb-release libexif12 xserver-xorg xorg x11-utils
+    chroot $BOOTSTRAP apt-get -y install icewm-lite unclutter chromium-browser lsb-release libexif12 xserver-xorg xorg xserver-xorg-video-fbdev x11-utils plymouth openssh-server
     chroot $BOOTSTRAP apt-get clean
     chroot $BOOTSTRAP apt-get autoclean
-    # create a user just for loading the kiosk page, allow ssh access eventually
     chroot $BOOTSTRAP adduser --disabled-password --gecos "" --quiet kiosk
 
+    # allow X to be launched from a script
     sed -i 's/^allowed_users=console$/allowed_users=anybody/' $BOOTSTRAP/etc/X11/Xwrapper.config
 
     mkdir -p $BOOTSTRAP/etc/systemd/system/getty\@tty1.service.d/
+    mkdir -p $BOOTSTRAP/home/kiosk/.ssh/
 
     cp config/etc.systemd.system.getty.tty1.service.d.autologin.conf $BOOTSTRAP/etc/systemd/system/getty\@tty1.service.d/autologin.conf
     cp config/home.kiosk.xinitrc $BOOTSTRAP/home/kiosk/.xinitrc
     cp config/home.kiosk.bash.profile $BOOTSTRAP/home/kiosk/.bash_profile
     cp bin/emerge-armhf $BOOTSTRAP/home/kiosk/.emerge
     cp config/home.kiosk.emerge.pl $BOOTSTRAP/home/kiosk/.emerge.pl
-    cp config/etc.profile.d.enginfo-config.sh $BOOTSTRAP/etc/profile.d/enginfo-config.sh
-    cp config/enginfo-config $BOOTSTRAP/usr/bin/enginfo-config
     cp config/home.kiosk.cron $BOOTSTRAP/home/kiosk/.cron
     cp config/home.kiosk.heartbeat.sh $BOOTSTRAP/home/kiosk/.heartbeat.sh
     cp config/root.iptables $BOOTSTRAP/root/iptables
+    cp config/home.kiosk.ssh.authorized_keys $BOOTSTRAP/home/kiosk/.ssh/authorized_keys
 
     echo '#!/bin/sh' > $BOOTSTRAP/etc/network/if-pre-up.d/tables
     echo "" >> $BOOTSTRAP/etc/network/if-pre-up.d/tables
     echo "/sbin/iptables-restore < /root/iptables" >> $BOOTSTRAP/etc/network/if-pre-up.d/tables
 
-    chmod +x $BOOTSTRAP/etc/profile.d/enginfo-config.sh
     chmod +x $BOOTSTRAP/home/kiosk/.emerge
-    chmod +x $BOOTSTRAP/usr/bin/enginfo-config
     chmod +x $BOOTSTRAP/home/kiosk/.heartbeat.sh
     chmod +x $BOOTSTRAP/etc/network/if-pre-up.d/tables
+    chmod +x $BOOTSTRAP/home/kiosk/.xinitrc
+    chmod 0600 $BOOTSTRAP/home/kiosk/.ssh/authorized_keys
+    chmod 0700 $BOOTSTRAP/home/kiosk/.ssh/
     
     chroot $BOOTSTRAP chown kiosk:kiosk /home/kiosk/.xinitrc
-    chmod +x $BOOTSTRAP/home/kiosk/.xinitrc
+    chroot $BOOTSTRAP chown -R kiosk:kiosk /home/kiosk/.ssh
 }
 
 monkey() {

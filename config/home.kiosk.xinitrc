@@ -16,6 +16,10 @@ else
 	export LOCATION="test"
 fi
 
+if [ -e /home/kiosk/.cron ]; then
+	/usr/bin/crontab /home/kiosk/.cron
+fi
+
 /bin/sleep 3
 
 # ping the server to let it know the kiosk is awake
